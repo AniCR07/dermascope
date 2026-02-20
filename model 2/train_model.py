@@ -4,56 +4,57 @@ import torch.optim as optim
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 
-# ---------------- CONFIG ----------------
-DATA_DIR = r"C:\Users\RAAM\Downloads\DermaDetectAI-main\sd-198"
+DATA_DIR = r"C:\Users\RAAM\Downloads\DermaDetectAI-main\model 2"
 BATCH_SIZE = 16
-EPOCHS = 10
+EPOCHS = 20
 LR = 0.0001
-NUM_CLASSES = 10   # change to 10 or 23 accordingly
+NUM_CLASSES = 10
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# ---------------- TRANSFORMS ----------------
 train_transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.RandomHorizontalFlip(),
-    transforms.ToTensor()
+    transforms.ToTensor(),
+    transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
 ])
 
 val_transform = transforms.Compose([
     transforms.Resize((224, 224)),
-    transforms.ToTensor()
+    transforms.ToTensor(),
+    transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
 ])
 
-# ---------------- DATASET ----------------
-train_dataset = datasets.ImageFolder(
-    root=f"{DATA_DIR}/train",
-    transform=train_transform
-)
+import os
 
-val_dataset = datasets.ImageFolder(
-    root=f"{DATA_DIR}/val",
-    transform=val_transform
-)
+train_path = os.path.join(DATA_DIR, "train")
+val_path = os.path.join(DATA_DIR, "val")
+
+import os
+
+train_path = os.path.join(DATA_DIR, "train")
+val_path = os.path.join(DATA_DIR, "val")
+
+train_dataset = datasets.ImageFolder(train_path, transform=train_transform)
+val_dataset = datasets.ImageFolder(val_path, transform=val_transform)
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 
 print("Class order:", train_dataset.classes)
 
-# ---------------- MODEL ----------------
 model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
 model = model.to(DEVICE)
 
-# ---------------- LOSS & OPTIMIZER ----------------
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=LR)
 
-# ---------------- TRAINING LOOP ----------------
 for epoch in range(EPOCHS):
+
     model.train()
-    running_loss = 0
+    correct = 0
+    total = 0
 
     for images, labels in train_loader:
         images, labels = images.to(DEVICE), labels.to(DEVICE)
@@ -64,10 +65,30 @@ for epoch in range(EPOCHS):
         loss.backward()
         optimizer.step()
 
-        running_loss += loss.item()
+        _, predicted = torch.max(outputs, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
 
-    print(f"Epoch [{epoch+1}/{EPOCHS}] - Loss: {running_loss:.4f}")
+    train_acc = correct / total
 
-# ---------------- SAVE MODEL ----------------
-torch.save(model.state_dict(), "skin_disease_model.pth")
-print("Model saved as skin_disease_model.pth")
+    model.eval()
+    val_correct = 0
+    val_total = 0
+
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            outputs = model(images)
+            _, predicted = torch.max(outputs, 1)
+            val_total += labels.size(0)
+            val_correct += (predicted == labels).sum().item()
+
+    val_acc = val_correct / val_total
+
+    print(f"Epoch {epoch+1}/{EPOCHS}")
+    print(f"Train Accuracy: {train_acc:.4f}")
+    print(f"Validation Accuracy: {val_acc:.4f}")
+    print("-"*40)
+
+torch.save(model.state_dict(), f"{DATA_DIR}/skin_disease_model.pth")
+print("Model 2 saved.")

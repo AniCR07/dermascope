@@ -2,10 +2,8 @@ import os
 import shutil
 import random
 
-# ---------------- CONFIG ----------------
-DATASET_DIR = r"C:\Users\RAAM\Downloads\DermaDetectAI-main\sd-198"
-IMAGES_DIR = os.path.join(DATASET_DIR, "images")
-TRAIN_RATIO = 0.8
+SOURCE_DIR = r"C:\Users\RAAM\Downloads\DermaDetectAI-main\sd-198\images"
+TARGET_DIR = r"C:\Users\RAAM\Downloads\DermaDetectAI-main\model 3"
 
 SELECTED_CLASSES = [
     "Acne_Vulgaris",
@@ -32,39 +30,27 @@ SELECTED_CLASSES = [
     "Urticaria",
     "Vitiligo"
 ]
+SPLIT = 0.8
 
-
-# ---------------- CLEAN OLD FOLDERS ----------------
-for split in ["train", "val"]:
-    split_path = os.path.join(DATASET_DIR, split)
-    if os.path.exists(split_path):
-        shutil.rmtree(split_path)
-
-# ---------------- CREATE DIRS ----------------
 for split in ["train", "val"]:
     for cls in SELECTED_CLASSES:
-        os.makedirs(os.path.join(DATASET_DIR, split, cls), exist_ok=True)
+        os.makedirs(os.path.join(TARGET_DIR, split, cls), exist_ok=True)
 
-# ---------------- SPLIT IMAGES ----------------
 for cls in SELECTED_CLASSES:
-    class_dir = os.path.join(IMAGES_DIR, cls)
-    images = os.listdir(class_dir)
+    src_path = os.path.join(SOURCE_DIR, cls)
+    images = os.listdir(src_path)
     random.shuffle(images)
 
-    split_idx = int(len(images) * TRAIN_RATIO)
+    split_idx = int(len(images) * SPLIT)
     train_imgs = images[:split_idx]
     val_imgs = images[split_idx:]
 
     for img in train_imgs:
-        shutil.copy(
-            os.path.join(class_dir, img),
-            os.path.join(DATASET_DIR, "train", cls, img)
-        )
+        shutil.copy(os.path.join(src_path, img),
+                    os.path.join(TARGET_DIR, "train", cls, img))
 
     for img in val_imgs:
-        shutil.copy(
-            os.path.join(class_dir, img),
-            os.path.join(DATASET_DIR, "val", cls, img)
-        )
+        shutil.copy(os.path.join(src_path, img),
+                    os.path.join(TARGET_DIR, "val", cls, img))
 
-print("✅ Dataset prepared successfully using folder-based classes")
+print("Model 3 dataset prepared.")

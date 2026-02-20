@@ -1,18 +1,26 @@
 import streamlit as st
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
 import torchvision.models as models
+import torchvision.transforms as transforms
 from PIL import Image
+import os
 
-# -------------------------------------------------
-# CONFIG FOR ALL MODELS
-# -------------------------------------------------
+# ===============================
+# PAGE CONFIG
+# ===============================
+st.set_page_config(page_title="AI DermaScope", layout="wide")
 
+st.title("🩺 AI DermaScope")
+st.write("Skin Disease Detection using Deep Learning")
+
+# ===============================
+# MODEL CONFIGURATION
+# ===============================
 MODEL_CONFIGS = {
-    "Model 1 – 5 Diseases": {
+    "Model 1 (5 classes)": {
         "num_classes": 5,
-        "model_path": "model 1/models/skin_disease_model.pth",
+        "path": "model 1/skin_disease_model.pth",
         "classes": [
             "Acne_Vulgaris",
             "Actinic_solar_Damage(Actinic_Keratosis)",
@@ -21,10 +29,9 @@ MODEL_CONFIGS = {
             "Psoriasis"
         ]
     },
-
-    "Model 2 – 10 Diseases": {
+    "Model 2 (10 classes)": {
         "num_classes": 10,
-        "model_path": "model 2/models/skin_disease_model.pth",
+        "path": "model 2/skin_disease_model.pth",
         "classes": [
             "Acne_Vulgaris",
             "Actinic_solar_Damage(Actinic_Keratosis)",
@@ -38,10 +45,9 @@ MODEL_CONFIGS = {
             "Vitiligo"
         ]
     },
-
-    "Model 3 – 23 Diseases": {
+    "Model 3 (23 classes)": {
         "num_classes": 23,
-        "model_path": "model 3/models/skin_disease_model.pth",
+        "path": "model 3/skin_disease_model.pth",
         "classes": [
             "Acne_Vulgaris",
             "Actinic_solar_Damage(Actinic_Keratosis)",
@@ -70,114 +76,239 @@ MODEL_CONFIGS = {
     }
 }
 
-# -------------------------------------------------
-# STREAMLIT PAGE CONFIG
-# -------------------------------------------------
+# ===============================
+# SELECT MODEL
+# ===============================
+st.header("Select Model")
 
-st.set_page_config(
-    page_title="AI DermaScope",
-    page_icon="🩺",
-    layout="centered"
+model_key = st.radio(
+    "Choose detection model:",
+    list(MODEL_CONFIGS.keys()),
+    horizontal=True
 )
 
-st.markdown("""
-<style>
-.stApp {
-    background: linear-gradient(135deg, #ecfeff, #f0fdf4);
-}
-.card {
-    background: white;
-    padding: 25px;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-}
-.center {
-    text-align: center;
-}
-</style>
-""", unsafe_allow_html=True)
+config = MODEL_CONFIGS[model_key]
+st.success(f"Using {model_key}")
 
-# -------------------------------------------------
-# MODEL LOADER (CACHED)
-# -------------------------------------------------
+# ===============================
+# LOAD MODEL
+# ===============================
+assert os.path.exists(config["path"]), f"Model file not found: {config['path']}"
 
-@st.cache_resource
-def load_model(model_path, num_classes):
-    model = models.resnet50(weights=None)
-    model.fc = nn.Linear(model.fc.in_features, num_classes)
-    model.load_state_dict(torch.load(model_path, map_location="cpu"))
-    model.eval()
-    return model
+model = models.resnet50(weights=None)
+model.fc = nn.Linear(model.fc.in_features, config["num_classes"])
 
-# -------------------------------------------------
-# IMAGE TRANSFORM
-# -------------------------------------------------
-
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor()
-])
-
-# -------------------------------------------------
-# UI – HOME PAGE
-# -------------------------------------------------
-
-st.markdown('<div class="card center">', unsafe_allow_html=True)
-st.title("🩺 AI DermaScope")
-st.subheader("Integrated Skin Disease Detection System")
-st.markdown("""
-Select a model based on the number of skin diseases you want to classify.
-""")
-st.markdown('</div>', unsafe_allow_html=True)
-
-# -------------------------------------------------
-# MODEL SELECTION
-# -------------------------------------------------
-
-selected_model_name = st.selectbox(
-    "Select Detection Model",
-    list(MODEL_CONFIGS.keys())
-)
-
-config = MODEL_CONFIGS[selected_model_name]
-
-st.info(
-    f"**{selected_model_name} selected**  \n"
-    f"Number of classes: {config['num_classes']}"
-)
-
-# -------------------------------------------------
-# LOAD SELECTED MODEL
-# -------------------------------------------------
-
-model = load_model(
-    config["model_path"],
-    config["num_classes"]
-)
+state_dict = torch.load(config["path"], map_location="cpu")
+model.load_state_dict(state_dict)
+model.eval()
 
 CLASS_NAMES = config["classes"]
 
-# -------------------------------------------------
-# IMAGE UPLOAD
-# -------------------------------------------------
+# ===============================
+# IMAGE TRANSFORM (MATCH TRAINING)
+# ===============================
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    )
+])
 
-uploaded_file = st.file_uploader(
-    "Upload a skin lesion image",
+# ===============================
+# REMEDY DATABASE (ALL 23 CLASSES)
+# ===============================
+REMEDIES = {
+
+    "Acne_Vulgaris": [
+        "Wash face twice daily with mild cleanser",
+        "Avoid oily skincare products",
+        "Do not squeeze pimples",
+        "Maintain balanced diet",
+        "Stay hydrated"
+    ],
+
+    "Actinic_solar_Damage(Actinic_Keratosis)": [
+        "Use sunscreen SPF 30+ daily",
+        "Avoid prolonged sun exposure",
+        "Wear protective clothing",
+        "Regular skin check-ups"
+    ],
+
+    "Basal_Cell_Carcinoma": [
+        "Avoid excessive sun exposure",
+        "Use sunscreen regularly",
+        "Do not ignore persistent skin lesions",
+        "Consult dermatologist promptly"
+    ],
+
+    "Benign_Keratosis": [
+        "Avoid scratching or picking lesions",
+        "Maintain good skin hygiene",
+        "Use sunscreen outdoors"
+    ],
+
+    "Bowen's_Disease": [
+        "Avoid sun exposure",
+        "Use protective clothing",
+        "Seek medical evaluation"
+    ],
+
+    "Dermatofibroma": [
+        "Avoid irritation to affected area",
+        "Monitor for size changes",
+        "Consult doctor if painful"
+    ],
+
+    "Discoid_Lupus_Erythematosus": [
+        "Avoid direct sun exposure",
+        "Use broad-spectrum sunscreen",
+        "Wear protective clothing"
+    ],
+
+    "Eczema": [
+        "Keep skin moisturized regularly",
+        "Avoid harsh soaps and detergents",
+        "Use lukewarm water for bathing",
+        "Avoid scratching affected areas",
+        "Wear soft cotton clothing"
+    ],
+
+    "Herpes_Simplex_Virus": [
+        "Avoid touching affected area",
+        "Maintain hygiene",
+        "Reduce stress",
+        "Avoid sharing personal items"
+    ],
+
+    "Herpes_Zoster": [
+        "Keep rash area clean and dry",
+        "Avoid scratching blisters",
+        "Rest adequately",
+        "Consult doctor if severe pain"
+    ],
+
+    "Impetigo": [
+        "Maintain skin hygiene",
+        "Avoid scratching",
+        "Do not share towels or clothes",
+        "Wash hands frequently"
+    ],
+
+    "Lichen_Planus": [
+        "Avoid scratching affected areas",
+        "Maintain good oral hygiene if involved",
+        "Reduce stress levels"
+    ],
+
+    "Malignant_Melanoma": [
+        "Avoid direct sun exposure",
+        "Use high SPF sunscreen",
+        "Monitor moles for changes",
+        "Seek immediate medical evaluation"
+    ],
+
+    "Molluscum_Contagiosum": [
+        "Avoid scratching bumps",
+        "Do not share towels",
+        "Maintain skin hygiene"
+    ],
+
+    "Psoriasis": [
+        "Keep skin moisturized",
+        "Manage stress",
+        "Avoid smoking and alcohol",
+        "Controlled sunlight exposure"
+    ],
+
+    "Rosacea": [
+        "Avoid spicy food and alcohol",
+        "Protect skin from sun",
+        "Use gentle skincare products",
+        "Avoid extreme temperatures"
+    ],
+
+    "Seborrheic_Dermatitis": [
+        "Use mild medicated shampoos",
+        "Avoid harsh hair products",
+        "Maintain scalp hygiene"
+    ],
+
+    "Seborrheic_Keratosis": [
+        "Avoid irritation of lesions",
+        "Use sunscreen regularly",
+        "Consult doctor if growth changes"
+    ],
+
+    "Skin_Tag": [
+        "Avoid friction to affected area",
+        "Maintain hygiene",
+        "Consult doctor if irritated"
+    ],
+
+    "Tinea_Corporis": [
+        "Keep affected area clean and dry",
+        "Avoid sharing clothes or towels",
+        "Wear breathable fabrics"
+    ],
+
+    "Tinea_Pedis": [
+        "Keep feet dry",
+        "Wear breathable footwear",
+        "Avoid walking barefoot in public areas"
+    ],
+
+    "Urticaria": [
+        "Identify and avoid triggers",
+        "Avoid scratching",
+        "Reduce stress"
+    ],
+
+    "Vitiligo": [
+        "Protect skin from sunburn",
+        "Use sunscreen daily",
+        "Maintain balanced nutrition"
+    ]
+}
+
+DEFAULT_REMEDY = [
+    "Maintain good skin hygiene",
+    "Avoid harsh chemicals and irritants",
+    "Keep skin moisturized",
+    "Consult a dermatologist if symptoms persist"
+]
+
+# ===============================
+# IMAGE UPLOAD
+# ===============================
+st.header("Upload Skin Image")
+
+uploaded = st.file_uploader(
+    "Upload image",
     type=["jpg", "jpeg", "png"]
 )
 
-if uploaded_file:
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, use_container_width=True)
+if uploaded:
+    image = Image.open(uploaded).convert("RGB")
+    st.image(image, width=350)
 
-    if st.button("🔍 Predict Disease"):
+    if st.button("Predict"):
         img_tensor = transform(image).unsqueeze(0)
 
         with torch.no_grad():
             outputs = model(img_tensor)
-            pred_idx = torch.argmax(outputs, dim=1).item()
+            probs = torch.softmax(outputs, dim=1)
+            pred_idx = torch.argmax(probs, dim=1).item()
 
         predicted_disease = CLASS_NAMES[pred_idx]
 
-        st.success(f"**Predicted Disease:** {predicted_disease}")
-        st.warning("⚠ This system is for educational and research purposes only.")
+        st.success(f"Predicted Disease: {predicted_disease}")
+
+        remedies = REMEDIES.get(predicted_disease, DEFAULT_REMEDY)
+
+        st.markdown("### Home Care & General Tips:")
+        for tip in remedies:
+            st.markdown(f"- {tip}")
+
+        st.warning("⚠ This is an AI-based educational prediction and not a medical diagnosis.")

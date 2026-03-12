@@ -9,10 +9,99 @@ import os
 # ===============================
 # PAGE CONFIG
 # ===============================
-st.set_page_config(page_title="AI DermaScope", layout="wide")
+st.set_page_config(
+    page_title="AI DermaScope",
+    layout="wide"
+)
 
-st.title("🩺 AI DermaScope")
-st.write("Skin Disease Detection using Deep Learning")
+# ===============================
+# PROFESSIONAL UI STYLE
+# ===============================
+st.markdown("""
+<style>
+
+/* MAIN BACKGROUND */
+.stApp {
+    background: linear-gradient(135deg,#e3f2fd,#bbdefb,#90caf9);
+}
+
+/* GLOBAL TEXT */
+html, body, [class*="css"] {
+    font-family: 'Segoe UI', sans-serif;
+    color:#111;
+}
+
+/* MAIN TITLE */
+.main-title{
+    font-size:60px;
+    font-weight:900;
+    text-align:center;
+    margin-top:20px;
+}
+
+/* SUBTITLE */
+.subtitle{
+    font-size:22px;
+    text-align:center;
+    margin-bottom:40px;
+}
+
+/* SECTION TITLES */
+.section{
+    font-size:26px;
+    font-weight:700;
+    margin-top:20px;
+}
+
+/* CARD STYLE */
+.card{
+    background:white;
+    padding:35px;
+    border-radius:18px;
+    box-shadow:0px 10px 35px rgba(0,0,0,0.15);
+}
+
+/* BUTTON STYLE */
+.stButton > button{
+    background:#4a90e2;
+    color:white;
+    font-size:20px;
+    font-weight:600;
+    height:60px;
+    width:230px;
+    border-radius:12px;
+    border:none;
+}
+
+.stButton > button:hover{
+    background:#357ABD;
+}
+
+/* FILE UPLOADER */
+[data-testid="stFileUploader"]{
+    background:white;
+    padding:25px;
+    border-radius:15px;
+}
+
+/* SUCCESS BOX */
+.stSuccess{
+    font-size:22px;
+}
+
+/* WARNING */
+.stWarning{
+    font-size:18px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ===============================
+# HEADER
+# ===============================
+st.markdown('<div class="main-title">🩺 AI DermaScope</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">AI Powered Skin Disease Detection Platform</div>', unsafe_allow_html=True)
 
 # ===============================
 # MODEL CONFIGURATION
@@ -49,46 +138,31 @@ MODEL_CONFIGS = {
         "num_classes": 23,
         "path": "model 3/skin_disease_model.pth",
         "classes": [
-            "Acne_Vulgaris",
-            "Actinic_solar_Damage(Actinic_Keratosis)",
-            "Basal_Cell_Carcinoma",
-            "Benign_Keratosis",
-            "Bowen's_Disease",
-            "Dermatofibroma",
-            "Discoid_Lupus_Erythematosus",
-            "Eczema",
-            "Herpes_Simplex_Virus",
-            "Herpes_Zoster",
-            "Impetigo",
-            "Lichen_Planus",
-            "Malignant_Melanoma",
-            "Molluscum_Contagiosum",
-            "Psoriasis",
-            "Rosacea",
-            "Seborrheic_Dermatitis",
-            "Seborrheic_Keratosis",
-            "Skin_Tag",
-            "Tinea_Corporis",
-            "Tinea_Pedis",
-            "Urticaria",
-            "Vitiligo"
+            "Acne_Vulgaris","Actinic_solar_Damage(Actinic_Keratosis)","Basal_Cell_Carcinoma",
+            "Benign_Keratosis","Bowen's_Disease","Dermatofibroma",
+            "Discoid_Lupus_Erythematosus","Eczema","Herpes_Simplex_Virus",
+            "Herpes_Zoster","Impetigo","Lichen_Planus",
+            "Malignant_Melanoma","Molluscum_Contagiosum","Psoriasis",
+            "Rosacea","Seborrheic_Dermatitis","Seborrheic_Keratosis",
+            "Skin_Tag","Tinea_Corporis","Tinea_Pedis",
+            "Urticaria","Vitiligo"
         ]
     }
 }
 
 # ===============================
-# SELECT MODEL
+# MODEL SELECT
 # ===============================
-st.header("Select Model")
+st.markdown('<div class="section">Select Detection Model</div>', unsafe_allow_html=True)
 
 model_key = st.radio(
-    "Choose detection model:",
+    "",
     list(MODEL_CONFIGS.keys()),
     horizontal=True
 )
 
 config = MODEL_CONFIGS[model_key]
-st.success(f"Using {model_key}")
+st.success(f"Active Model: {model_key}")
 
 # ===============================
 # LOAD MODEL
@@ -105,19 +179,19 @@ model.eval()
 CLASS_NAMES = config["classes"]
 
 # ===============================
-# IMAGE TRANSFORM (MATCH TRAINING)
+# IMAGE TRANSFORM
 # ===============================
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize((224,224)),
     transforms.ToTensor(),
     transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]
+        mean=[0.485,0.456,0.406],
+        std=[0.229,0.224,0.225]
     )
 ])
 
 # ===============================
-# REMEDY DATABASE (ALL 23 CLASSES)
+# REMEDIES
 # ===============================
 REMEDIES = {
 
@@ -282,33 +356,45 @@ DEFAULT_REMEDY = [
 # ===============================
 # IMAGE UPLOAD
 # ===============================
-st.header("Upload Skin Image")
+st.markdown('<div class="section">Upload Skin Image</div>', unsafe_allow_html=True)
 
-uploaded = st.file_uploader(
-    "Upload image",
-    type=["jpg", "jpeg", "png"]
-)
+uploaded = st.file_uploader("", type=["jpg","jpeg","png"])
 
 if uploaded:
+
     image = Image.open(uploaded).convert("RGB")
-    st.image(image, width=350)
 
-    if st.button("Predict"):
-        img_tensor = transform(image).unsqueeze(0)
+    col1, col2 = st.columns([1,1])
 
-        with torch.no_grad():
-            outputs = model(img_tensor)
-            probs = torch.softmax(outputs, dim=1)
-            pred_idx = torch.argmax(probs, dim=1).item()
+    with col1:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.image(image,use_column_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        predicted_disease = CLASS_NAMES[pred_idx]
+    with col2:
 
-        st.success(f"Predicted Disease: {predicted_disease}")
+        if st.button("🔬 Analyze Image"):
 
-        remedies = REMEDIES.get(predicted_disease, DEFAULT_REMEDY)
+            img_tensor = transform(image).unsqueeze(0)
 
-        st.markdown("### Home Care & General Tips:")
-        for tip in remedies:
-            st.markdown(f"- {tip}")
+            with torch.no_grad():
+                outputs = model(img_tensor)
+                probs = torch.softmax(outputs,dim=1)
+                pred_idx = torch.argmax(probs,dim=1).item()
 
-        st.warning("⚠ This is an AI-based educational prediction and not a medical diagnosis.")
+            predicted_disease = CLASS_NAMES[pred_idx]
+
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+
+            st.success(f"Prediction: {predicted_disease}")
+
+            remedies = REMEDIES.get(predicted_disease,DEFAULT_REMEDY)
+
+            st.markdown("### Care Suggestions")
+
+            for tip in remedies:
+                st.write("•",tip)
+
+            st.warning("This AI prediction is educational and not a medical diagnosis.")
+
+            st.markdown('</div>', unsafe_allow_html=True)

@@ -5,6 +5,16 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
 import os
+import telepot
+from telepot.loop import MessageLoop
+import io
+import threading
+import tempfile
+
+# ===============================
+# TELEGRAM BOT CONFIGURATION
+# ===============================
+TELEGRAM_TOKEN = "8639367055:AAG2HOZ8156Wc0vYh9D-RYvroYrduRgXdCY"  # Replace with your actual bot token
 
 # ===============================
 # PAGE CONFIG
@@ -352,6 +362,115 @@ DEFAULT_REMEDY = [
     "Keep skin moisturized",
     "Consult a dermatologist if symptoms persist"
 ]
+
+# ===============================
+# TELEGRAM BOT HANDLER
+# ===============================
+def handle_telegram_message(msg):
+    """Handle incoming Telegram messages"""
+    chat_id = msg['chat']['id']
+    
+    # Check if message contains a photo
+    if 'photo' in msg:
+        try:
+            # Send processing message
+            bot = telepot.Bot(TELEGRAM_TOKEN)
+            bot.sendMessage(chat_id, "🔍 Analyzing your image... Please wait.")
+            
+            # Get the photo file ID (largest size is last)
+            photo_id = msg['photo'][-1]['file_id']
+            
+            # Create a temporary file to save the image
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                temp_path = temp_file.name
+            
+            # Download the photo to the temporary file
+            bot.download_file(photo_id, temp_path)
+            
+            # Open image with PIL
+            image = Image.open(temp_path).convert("RGB")
+            
+            # Clean up temporary file
+            os.unlink(temp_path)
+            
+            # Perform prediction
+            img_tensor = transform(image).unsqueeze(0)
+            
+            with torch.no_grad():
+                outputs = model(img_tensor)
+                probs = torch.softmax(outputs, dim=1)
+                pred_idx = torch.argmax(probs, dim=1).item()
+            
+            predicted_disease = CLASS_NAMES[pred_idx]
+            remedies = REMEDIES.get(predicted_disease, DEFAULT_REMEDY)
+            
+            # Format response
+            response = f"🩺 *Prediction:* {predicted_disease}\n\n"
+            response += "*💊 Care Suggestions:*\n"
+            for remedy in remedies:
+                response += f"• {remedy}\n"
+            response += "\n⚠️ *This AI prediction is educational and not a medical diagnosis.*"
+            
+            # Send prediction back to same chat
+            bot.sendMessage(chat_id, response, parse_mode='Markdown')
+            
+        except Exception as e:
+            bot = telepot.Bot(TELEGRAM_TOKEN)
+            bot.sendMessage(chat_id, f"❌ Error processing image: {str(e)}\nPlease try again with a clearer image.")
+    
+    # Handle text messages
+    elif 'text' in msg:
+        text = msg['text'].lower()
+        bot = telepot.Bot(TELEGRAM_TOKEN)
+        
+        if text == '/start':
+            welcome_msg = (
+                "🤖 Welcome to AI DermaScope Bot!\n\n"
+                "Send me a skin image and I'll analyze it using AI to detect potential skin conditions.\n\n"
+                "Commands:\n"
+                "/start - Show this message\n"
+                "/help - Get help information\n"
+                "/model - Show current active model"
+            )
+            bot.sendMessage(chat_id, welcome_msg)
+        
+        elif text == '/help':
+            help_msg = (
+                "📋 How to use:\n"
+                "1. Send a clear image of the skin condition\n"
+                "2. I'll analyze it using the active AI model\n"
+                "3. You'll receive:\n"
+                "   - Predicted condition\n"
+                "   - Care suggestions\n\n"
+                "⚠️ Note: This is for educational purposes only. Always consult a dermatologist for medical advice."
+            )
+            bot.sendMessage(chat_id, help_msg)
+        
+        elif text == '/model':
+            bot.sendMessage(chat_id, f"🧠 Current Active Model: {model_key}\n📊 Number of classes: {len(CLASS_NAMES)}")
+        
+        else:
+            bot.sendMessage(chat_id, "Please send an image of the skin condition for analysis.\nUse /help for more information.")
+
+# ===============================
+# START TELEGRAM BOT
+# ===============================
+def run_telegram_bot():
+    """Run the Telegram bot"""
+    if TELEGRAM_TOKEN != "YOUR_BOT_TOKEN_HERE":
+        bot = telepot.Bot(TELEGRAM_TOKEN)
+        MessageLoop(bot, handle_telegram_message).run_as_thread()
+        return True
+    return False
+
+# Start Telegram bot in background thread
+bot_running = run_telegram_bot()
+
+if bot_running:
+    st.sidebar.success("🤖 Telegram Bot is running!")
+    st.sidebar.info(f"Active Model: {model_key}")
+else:
+    st.sidebar.warning("⚠️ Telegram bot token not configured. Add your bot token to enable Telegram functionality.")
 
 # ===============================
 # IMAGE UPLOAD
